@@ -18,6 +18,8 @@ create TABLE price(
   recordDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+create TABLE price(id SERIAL PRIMARY KEY, name VARCHAR(255), lastPrice VARCHAR(255), indexPrice VARCHAR(255), markPrice VARCHAR(255), recordDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+
 create TABLE post(
   id SERIAL PRIMARY KEY,
   title VARCHAR(255),

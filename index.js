@@ -153,19 +153,21 @@ const getPercent = async () => {
   })
 }
 
-const getPercent2 = async (s, first, last, minmax, text) => {
+const getPercent2 = async (s, first, last, level, text, minmax) => {
   const firstPrice = first;
   const lastPrice = last;
 
   if (firstPrice < lastPrice) {
     const tmp = 100 - (firstPrice / lastPrice) * 100;
-    
-    if (tmp >= (minmax + 1) && !sentCoins.includes(s)) {
+    if (tmp >= level && !sentCoins.includes(s)) {
 
       sentCoins.push(s);
       setTimeout(() => {
-        sentCoins.shift();
-      }, 1100 * 60);
+        const index = sentCoins.indexOf(`${s}`);
+        if (index !== -1) {
+          sentCoins.splice(index, 1);
+        }
+      }, 1000 * 60);
 
       console.log(chalk.green(`${s} +${tmp.toFixed(2)}% ${text}`));
       await bot.sendMessage(chatId, `🟢  ${s}.P +${tmp.toFixed(2)}% ${text}`);
@@ -173,13 +175,16 @@ const getPercent2 = async (s, first, last, minmax, text) => {
     return;
   }
 
-  const tmp = (firstPrice / lastPrice) * 100 - 100;
-  if (tmp >= minmax && !sentCoins.includes(s)) {
+  const tmp = (firstPrice / minmax.min) * 100 - 100;
+  if (tmp >= level && !sentCoins.includes(s)) {
 
     sentCoins.push(s);
     setTimeout(() => {
-      sentCoins.shift();
-    }, 1100 * 60);
+      const index = sentCoins.indexOf(`${s}`);
+      if (index !== -1) {
+        sentCoins.splice(index, 1);
+      }
+    }, 1000 * 60);
 
     console.log(chalk.red(` ${s} -${tmp.toFixed(2)}% ${text}`));
     await bot.sendMessage(chatId, `🔴  ${s}.P -${tmp.toFixed(2)}% ${text}`);
@@ -199,27 +204,58 @@ setInterval(async () => {
   let objOneMinute = {};
   let objTwoMinute = {};
 
-
   symbols.forEach(element => {
-    objOneMinute[element] = [];
-    objTwoMinute[element] = [];
+    objOneMinute[element] = {
+      min: 1000000000,
+      max: 0,
+      data: []
+    };
+    objTwoMinute[element] = {
+      min: 1000000000,
+      max: 0,
+      data: []
+    };
   });  
 
   const response = await controller.getLastMinutePrice();
-  response.forEach(e => {
-    objOneMinute[e.name].push(e.indexprice);
+  response.forEach((e, i) => {
+    objOneMinute[e.name].data.push(e.indexprice);
+    
+    if (e.indexprice < objOneMinute[e.name].min) objOneMinute[e.name].min = e.indexprice;
+    if (e.indexprice > objOneMinute[e.name].max) objOneMinute[e.name].max = e.indexprice;
   });
 
   const response2 = await controller.getLastTwoMinutePrice();
-  response2.forEach(e => {
-    objTwoMinute[e.name].push(e.indexprice);
+  response2.forEach((e, i) => {
+    objTwoMinute[e.name].data.push(e.indexprice);
+
+    if (e.indexprice < objTwoMinute[e.name].min) objTwoMinute[e.name].min = e.indexprice;
+    if (e.indexprice > objTwoMinute[e.name].max) objTwoMinute[e.name].max = e.indexprice;
   });
 
   symbols.forEach(element => {
-    const lastElement = objOneMinute[element].length - 1;
-    getPercent2(element, objOneMinute[element][0], objOneMinute[element][lastElement], 1.5, 'за 1 минуту');
+    if (!objOneMinute[element].data.length) {
+      return;
+    }
 
-    const lastElement2 = objTwoMinute[element].length - 1;
-    getPercent2(element, objTwoMinute[element][0], objTwoMinute[element][lastElement2], 1.9, 'за 2 минуты');
+    const lastElement = objOneMinute[element].data.length - 1;
+    getPercent2(
+      element,
+      objOneMinute[element].data[0],
+      objOneMinute[element].data[lastElement],
+      1,
+      'за 1 минуту',
+      {min: objOneMinute[element]['min'], max: objOneMinute[element]['max']}
+    );
+
+    const lastElement2 = objTwoMinute[element].data.length - 1;
+    getPercent2(
+      element,
+      objTwoMinute[element].data[0],
+      objTwoMinute[element].data[lastElement2],
+      1.5,
+      'за 2 минуты',
+      {min: objTwoMinute[element]['min'], max: objTwoMinute[element]['max']}
+    );
   });
-}, 1000);
+}, 500);
